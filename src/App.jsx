@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { PDFViewer, PDFDownloadLink } from '@react-pdf/renderer';
+import ReceiptPDF from './ReceiptPDF';
 
 export default function App() {
   const [customer, setCustomer] = useState({
@@ -14,7 +16,15 @@ export default function App() {
   const [deliveryFee, setDeliveryFee] = useState(0);
 
   const handleCustomerChange = (e) => {
-    setCustomer({ ...customer, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    
+    if (name === 'phone') {
+      // Prevent strings: replace anything that is NOT a digit (\D) with an empty string
+      const numbersOnly = value.replace(/\D/g, '');
+      setCustomer({ ...customer, [name]: numbersOnly });
+    } else {
+      setCustomer({ ...customer, [name]: value });
+    }
   };
 
   const updateItem = (id, field, value) => {
@@ -31,9 +41,11 @@ export default function App() {
     setItems(items.filter(item => item.id !== id));
   };
 
-  // Calculate totals
   const subtotal = items.reduce((sum, item) => sum + (item.qty * item.price), 0);
   const total = subtotal + Number(deliveryFee);
+
+  // We bundle the props into a single object so we can easily pass them to both the Viewer and the Download button
+  const pdfProps = { customer, items, deliveryFee, subtotal, total };
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
@@ -62,7 +74,7 @@ export default function App() {
               />
               <div className="grid grid-cols-2 gap-4">
                 <input 
-                  type="text" name="phone" placeholder="Phone Number" 
+                  type="text" name="phone" placeholder="Phone Number (Numbers Only)" 
                   value={customer.phone} onChange={handleCustomerChange}
                   className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
                 />
@@ -77,7 +89,7 @@ export default function App() {
             {/* Line Items */}
             <div className="space-y-4 mb-8">
               <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider">Items</h3>
-              {items.map((item, index) => (
+              {items.map((item) => (
                 <div key={item.id} className="flex gap-2 items-center">
                   <input 
                     type="text" placeholder="Item description" 
@@ -123,11 +135,26 @@ export default function App() {
             </div>
           </div>
 
-          {/* RIGHT COLUMN: PDF Preview */}
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 flex flex-col">
-            <h2 className="text-xl font-semibold mb-4">Receipt Preview</h2>
-            <div className="flex-1 bg-gray-100 rounded border-2 border-dashed border-gray-300 flex items-center justify-center min-h-[400px]">
-              <p className="text-gray-500 text-sm">PDF viewer will mount here</p>
+          {/* RIGHT COLUMN: PDF Preview & Download Action */}
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 flex flex-col h-full">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">Receipt Preview</h2>
+              
+              {/* Dedicated Download Button */}
+              <PDFDownloadLink 
+                document={<ReceiptPDF {...pdfProps} />} 
+                fileName={`KigaliSwimShop_Receipt_${customer.name ? customer.name.replace(/\s+/g, '_') : 'Walk_in'}.pdf`}
+                className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-700 transition-colors"
+              >
+                {({ loading }) => (loading ? 'Preparing Document...' : 'Download PDF')}
+              </PDFDownloadLink>
+            </div>
+            
+            {/* Render the PDF inside the Viewer */}
+            <div className="flex-1 bg-gray-100 rounded border border-gray-200 overflow-hidden min-h-[600px]">
+              <PDFViewer width="100%" height="100%" className="border-none">
+                <ReceiptPDF {...pdfProps} />
+              </PDFViewer>
             </div>
 
             {/* Disclaimer paragraph configured to align left on mobile devices only */}
